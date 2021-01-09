@@ -1,74 +1,36 @@
 const path = require('path');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const HTMLWebpackPlugin = require('html-webpack-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
+
+const isProd = process.env.NODE_ENV === 'production';
+const isDev = !isProd;
+
+const filename = ext => isDev ? `bundle.${ext}` : `bundle.[hash].${ext}`;
+
+const jsLoaders = () => {
+	const loaders = [
+		{
+			loader: 'babel-loader',
+			options: {
+				presets: ['@babel/preset-env']
+			}
+		},
+	];
+
+	return loaders;
+};
 
 module.exports = {
-	entry: {
-		app: './js/app.js',
-		polyfill: 'babel-polyfill',
-	},
-	// Также webpack рекомендует явно указывать, в какой директории находятся исходные файлы проекта (ресурсы). Для этого следует использовать свойство context:
+	entry: ['@babel/polyfill', './index.js'],
 	context: path.resolve(__dirname, 'src'),
 	output: {
-		path: path.resolve(__dirname, './dist'),
-		filename: '[name].[hash].js',
+		path: path.resolve(__dirname, 'dist'),
+		filename: filename('js'),
 	},
 	module: {
-		rules: [{
-				test: /\.js$/,
-				loader: 'babel-loader',
-				exclude: '/node-modules'
-			},
-			{
-				test: /\.css$/,
-				use: [
-					"style-loader",
-					MiniCssExtractPlugin.loader,
-					{
-						loader: 'css-loader',
-						options: {
-							sourceMap: true,
-						},
-					},
-					{
-						loader: 'postcss-loader',
-						options: {
-							sourceMap: true,
-							config: {
-								path: 'src/js/postcss.config.js'
-							}
-						},
-					},
-				],
-			},
-			{
-				test: /\.sass$/,
-				use: [
-					"style-loader",
-					MiniCssExtractPlugin.loader,
-					{
-						loader: 'css-loader',
-						options: {
-							sourceMap: true,
-						},
-					},
-					{
-						loader: 'postcss-loader',
-						options: {
-							sourceMap: true,
-							config: {
-								path: 'src/js/postcss.config.js'
-							}
-						},
-					},
-					{
-						loader: 'sass-loader',
-						options: {
-							sourceMap: true,
-						},
-					},
-				]
-			},
+		rules: [
 			{
 				test: /\.(png|jpe?g|gif)$/,
 				use: [{
@@ -78,29 +40,68 @@ module.exports = {
 					},
 				}, ],
 			},
-
-		]
+			{
+				test: /\.(ttf|eot|woff2|woff|svg|png|jpg|gif|ico)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
+				loader: 'file-loader'
+			},
+      {
+        test: /\.s[ac]ss$/i,
+        use: [
+					{
+						loader: MiniCssExtractPlugin.loader,
+						options: {
+							hmr: isDev,
+							reloadAll: true,
+						}
+					},
+          'css-loader',
+          'sass-loader',
+        ],
+			},
+			{
+        test: /\.m?js$/,
+        exclude: '/node_modules/',
+				use: jsLoaders()
+      }
+    ],
 	},
 	plugins: [
-		new MiniCssExtractPlugin({
-			// Options similar to the same options in webpackOptions.output
-			// both options are optional
-			filename: '[name].css',
-		}),
-		new HtmlWebpackPlugin({
+		new CleanWebpackPlugin(),
+		new HTMLWebpackPlugin({
 			template: './index.html',
+			minify: {
+				removeComments: isProd,
+				collapseWhitespace: isProd,
+			}
+		}),
+		new CopyPlugin({
+			patterns: [
+				{ from: path.resolve(__dirname, 'src/favicon.ico'), to: path.resolve(__dirname, 'dist') },
+			],
+		}),
+		new MiniCssExtractPlugin({
+			filename: filename('css')
 		}),
 	],
-  devServer: {
-    publicPath: '/',
-    port: 9000,
+	resolve: {
+		extensions: ['.js'],
+		alias: {
+			'@': path.resolve(__dirname, 'src'),
+			'@core': path.resolve(__dirname, 'src/core'),
+		}
+	},
+	devServer: {
+		publicPath: '/',
+		port: 2094,
     contentBase: path.join(__dirname, 'src'),
+    compress: true,
+		hot: isDev,
 		host: 'localhost',
+		overlay: true,
 		watchContentBase: true,
     historyApiFallback: true,
     noInfo: false,
     stats: 'minimal',
-		hot: true,
-		overlay: true,
   },
+	devtool: isDev ? 'source-map' : false,
 };
